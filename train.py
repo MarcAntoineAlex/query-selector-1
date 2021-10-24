@@ -8,6 +8,7 @@ import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
+from deepspeed import deepspeed
 import torch.nn as nn
 
 import ipc
@@ -132,17 +133,15 @@ def run_iteration(model, loader, args, training=True, message = ''):
 
 def preform_experiment(args):
     model = get_model(args)
-    student = get_model(args)
     params = list(get_params(model))
     print('Number of parameters: {}'.format(len(params)))
     for p in params:
         print(p.shape)
 
     if args.deepspeed:
-        # deepspeed_engine, optimizer, _, _ = deepspeed.initialize(args=args,
-        #                                                       model=model,
-        #                                                       model_parameters=params)
-        pass
+        deepspeed_engine, optimizer, _, _ = deepspeed.initialize(args=args,
+                                                              model=model,
+                                                              model_parameters=params)
     else:
         model.to('cuda')
         model.optim = Adam(params, lr=0.001)
@@ -153,8 +152,7 @@ def preform_experiment(args):
 
     start = time.time()
     for iter in range(1, args.iterations + 1):
-        # preds, trues = run_iteration(deepspeed_engine if args.deepspeed else model , train_loader, args, training=True, message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
-        preds, trues = run_iteration(model , train_loader, args, training=True, message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
+        preds, trues = run_iteration(deepspeed_engine if args.deepspeed else model , train_loader, args, training=True, message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
         mse, mae = run_metrics("Loss after iteration {}".format(iter), preds, trues)
         if args.local_rank == 0:
             ipc.sendPartials(iter, mse, mae)
@@ -167,19 +165,19 @@ def preform_experiment(args):
 
 
     test_data, test_loader = _get_data(args, flag='test')
-    # if deepspeed:
-    #     model.inference()
-    # else:
-    model.eval()
+    if deepspeed:
+        model.inference()
+    else:
+        model.eval()
     # Model evaluation on validation data
-    # v_preds, v_trues = run_iteration(deepspeed_engine if args.deepspeed_enginepeed else model, test_loader, args, training=False, message="Validation set")
-    v_preds, v_trues = run_iteration(model, test_loader, args, training=False, message="Validation set")
+    v_preds, v_trues = run_iteration(deepspeed_engine if args.deepspeed else model, test_loader, args, training=False, message="Validation set")
     mse, mae = run_metrics("Loss for validation set ", v_preds, v_trues)
 
     # Send results / plot models if debug option is on
     if args.local_rank == 0:
         ipc.sendResults(mse, mae)
-
+        if args.debug:
+            plot_model(args, model)
 
 def main():
     parser = build_parser()
