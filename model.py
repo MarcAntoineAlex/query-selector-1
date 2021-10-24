@@ -281,6 +281,7 @@ class Transformer(InferenceModule):
         self.out_fc = Linear(dec_seq_len * dim_val, out_seq_len*output_len)
 
         self.debug = debug
+        self.arch = torch.nn.Parameter(torch.ones(8512, 1, 1))
 
     def forward(self, x):
         # encoder
@@ -300,6 +301,23 @@ class Transformer(InferenceModule):
         # output
         x = self.out_fc(d.flatten(start_dim=1))
         return torch.reshape(x, (x.shape[0], -1, self.output_len))
+
+    def W(self):
+        for n, p in self.named_parameters():
+            if 'arch' in n:
+                pass
+            else:
+                yield p
+
+    def named_W(self):
+        for n, p in self.named_parameters():
+            if 'arch' in n:
+                pass
+            else:
+                yield n, p
+
+    def A(self):
+        yield self.arch
 
     def record(self):
         self.debug = True

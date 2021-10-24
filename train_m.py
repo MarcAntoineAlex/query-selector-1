@@ -7,8 +7,6 @@ import torch
 
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-
-from deepspeed import deepspeed
 import torch.nn as nn
 
 import ipc
@@ -26,8 +24,8 @@ def get_model(args):
                        dec_attn_type=args.decoder_attention, dropout=args.dropout)
 
 
-def get_params(mdl):
-    return mdl.parameters()
+def get_W(mdl):
+    return mdl.W()
 
 
 def _get_data(args, flag):
@@ -88,72 +86,102 @@ def run_metrics(caption, preds, trues):
     return mse, mae
 
 
-def run_iteration(model, loader, args, training=True, message = ''):
+def run_iteration(teacher, student, trn_loader, val_loader, architect, args, message =''):
     preds = []
     trues = []
     total_loss = 0
     elem_num = 0
     steps = 0
     target_device = 'cuda:{}'.format(args.local_rank)
-    for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(loader):
-        if not args.deepspeed:
-            model.optim.zero_grad()
+    for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(trn_loader):
+        try:
+            val_data = next(val_iter)
+        except:
+            val_iter = iter(val_loader)
+            val_data = next(val_iter)
+
 
         batch = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        target = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32,
-                              device=target_device)
+        target = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+
+
+        elem_num += len(batch)
+        steps += 1
+
+        teacher.optimA.zero_grad()
+        # architect.unrolled_backward()
+
+        teacher.optim.zero_grad()
+
+        result = teacher(batch)
+        loss = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean') # todo: critere
+        preds.append(result.detach().cpu().numpy())
+        trues.append(target.detach().cpu().numpy())
+        unscaled_loss = loss.item()
+        total_loss += unscaled_loss
+        print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss, total_loss / steps,torch.cuda.max_memory_allocated()))
+        loss.backward()
+        teacher.optim.step()
+
+        result = student(batch)
+        loss_s1 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
+        target = torch.cat([target[:, :args.label_len, :], result], dim=1)
+        loss_s2 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
+        loss_s = loss_s1 + loss_s2
+        loss_s.backward()
+        student.optim.step()
+
+    return preds, trues
+
+
+def test(model, test_loader, args, message=''):
+    preds = []
+    trues = []
+    total_loss = 0
+    elem_num = 0
+    steps = 0
+    target_device = 'cuda:{}'.format(args.local_rank)
+    for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+        batch = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        target = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
 
         elem_num += len(batch)
         steps += 1
 
         result = model(batch)
-
-        loss = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
-
-        #pred = result.detach().cpu().unsqueeze(2).numpy()  # .squeeze()
-        pred = result.detach().cpu().numpy()  # .squeeze()
-        true = target.detach().cpu().numpy()  # .squeeze()
-
-        preds.append(pred)
-        trues.append(true)
-
+        loss = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')  # todo: critere
+        preds.append(result.detach().cpu().numpy())
+        trues.append(target.detach().cpu().numpy())
         unscaled_loss = loss.item()
         total_loss += unscaled_loss
-        print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss, total_loss / steps,torch.cuda.max_memory_allocated()))
-
-        if training:
-            if args.deepspeed:
-                model.backward(loss)
-                model.step()
-            else:
-                loss.backward()
-                model.optim.step()
+        print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss,
+                                                                                 total_loss / steps,
+                                                                                 torch.cuda.max_memory_allocated()))
     return preds, trues
 
-
 def preform_experiment(args):
-    model = get_model(args)
+    teacher = get_model(args)
     student = get_model(args)
-    params = list(get_params(model))
+    params = list(get_W(teacher))
     print('Number of parameters: {}'.format(len(params)))
     for p in params:
         print(p.shape)
 
-    if args.deepspeed:
-        deepspeed_engine, optimizer, _, _ = deepspeed.initialize(args=args,
-                                                              model=model,
-                                                              model_parameters=params)
-    else:
-        model.to('cuda')
-        model.optim = Adam(params, lr=0.001)
+    teacher.to('cuda')
+    teacher.optim = Adam(params, lr=0.001)
+    teacher.optimA = Adam(teacher.A(), lr=0.3, weight_decay=0.)
+    student.to('cuda')
+    student.optim = Adam(params, lr=0.001)
 
     train_data, train_loader = _get_data(args, flag='train')
+    valid_data, valid_loader = _get_data(args, flag='test')
 
-
+    architect = None  # todo: check
 
     start = time.time()
     for iter in range(1, args.iterations + 1):
-        preds, trues = run_iteration(deepspeed_engine if args.deepspeed else model , train_loader, args, training=True, message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
+        preds, trues = run_iteration(teacher, student, train_loader, valid_loader, architect, args,
+                                     message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
         mse, mae = run_metrics("Loss after iteration {}".format(iter), preds, trues)
         if args.local_rank == 0:
             ipc.sendPartials(iter, mse, mae)
@@ -162,23 +190,31 @@ def preform_experiment(args):
     print(torch.cuda.max_memory_allocated())
 
     if args.debug:
-        model.record()
+        teacher.record()
 
 
     test_data, test_loader = _get_data(args, flag='test')
-    if deepspeed:
-        model.inference()
-    else:
-        model.eval()
+
+    teacher.eval()
     # Model evaluation on validation data
-    v_preds, v_trues = run_iteration(deepspeed_engine if args.deepspeed else model, test_loader, args, training=False, message="Validation set")
-    mse, mae = run_metrics("Loss for validation set ", v_preds, v_trues)
+    v_preds, v_trues = test(teacher, test_loader, args, message="Validation set teacher")
+    v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
+
+    mse, mae = run_metrics("Loss for validation set teacher", v_preds, v_trues)
+    mse, mae = run_metrics("Loss for validation set student", v_preds, v_trues)
 
     # Send results / plot models if debug option is on
-    if args.local_rank == 0:
-        ipc.sendResults(mse, mae)
-        if args.debug:
-            plot_model(args, model)
+
+
+def critere(model, pred, true, data_count, reduction='mean'):
+    weights = model.arch[data_count:data_count + pred.shape[0]]
+    weights = torch.softmax(weights, dim=0) ** 0.5
+    if reduction != 'mean':
+        crit = nn.MSELoss(reduction=reduction)
+        return crit(pred * weights, true * weights).mean(dim=(-1, -2))
+    else:
+        crit = nn.MSELoss()
+        return crit(pred * weights, true * weights)
 
 def main():
     parser = build_parser()
