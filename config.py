@@ -111,7 +111,7 @@ def build_parser():
     parser.add_argument('--seq_len', type=int, default=96)
     parser.add_argument('--dec_seq_len', type=int, default=96)
     parser.add_argument('--pred_len', type=int, default=48)
-    parser.add_argument('--features', type=str, default='multi')
+    parser.add_argument('--features', type=str, default='M')
     parser.add_argument('--target', default='OT', type=str)
     parser.add_argument('--iterations', type=int, default=5)
     parser.add_argument('--exps', type=int, default=5)
