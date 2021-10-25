@@ -174,10 +174,10 @@ def preform_experiment(args):
     mse, mae = run_metrics("Loss for validation set ", v_preds, v_trues)
 
     # Send results / plot models if debug option is on
-    if args.local_rank == 0:
-        ipc.sendResults(mse, mae)
-        if args.debug:
-            plot_model(args, model)
+    # if args.local_rank == 0:
+    #     ipc.sendResults(mse, mae)
+    #     if args.debug:
+    #         plot_model(args, model)
 
 def main():
     parser = build_parser()
