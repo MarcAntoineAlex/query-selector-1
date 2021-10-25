@@ -14,6 +14,7 @@ from config import build_parser
 from model import Transformer
 from data_loader import Dataset_ETT_hour, Dataset_ETT_minute
 from metrics import metric
+from architect import Architect
 
 
 def get_model(args):
@@ -86,12 +87,13 @@ def run_metrics(caption, preds, trues):
     return mse, mae
 
 
-def run_iteration(teacher, student, trn_loader, val_loader, architect, args, message =''):
+def run_iteration(teacher, student, trn_loader, val_loader, next_loader, architect, args, message =''):
     preds = []
     trues = []
     total_loss = 0
     elem_num = 0
     steps = 0
+    data_count = 0
     target_device = 'cuda:{}'.format(args.local_rank)
     for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(trn_loader):
         try:
@@ -100,16 +102,20 @@ def run_iteration(teacher, student, trn_loader, val_loader, architect, args, mes
             val_iter = iter(val_loader)
             val_data = next(val_iter)
 
+        try:
+            next_data = next(next_iter)
+        except:
+            next_iter = iter(next_loader)
+            next_data = next(next_iter)
 
         batch = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         target = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-
 
         elem_num += len(batch)
         steps += 1
 
         teacher.optimA.zero_grad()
-        # architect.unrolled_backward()
+        architect.unrolled_backward(args, (batch_x, batch_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
 
         teacher.optim.zero_grad()
 
@@ -130,6 +136,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, architect, args, mes
         loss_s = loss_s1 + loss_s2
         loss_s.backward()
         student.optim.step()
+        data_count += batch_x.shape[0]
 
     return preds, trues
 
@@ -175,12 +182,13 @@ def preform_experiment(args):
 
     train_data, train_loader = _get_data(args, flag='train')
     valid_data, valid_loader = _get_data(args, flag='test')
+    next_data, next_loader = _get_data(args, flag='train') # todo: check
 
-    architect = None  # todo: check
+    architect = Architect(args, nn.MSELoss, teacher, student)
 
     start = time.time()
     for iter in range(1, args.iterations + 1):
-        preds, trues = run_iteration(teacher, student, train_loader, valid_loader, architect, args,
+        preds, trues = run_iteration(teacher, student, train_loader, valid_loader, next_loader, architect, args,
                                      message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
         mse, mae = run_metrics("Loss after iteration {}".format(iter), preds, trues)
         # if args.local_rank == 0:
@@ -201,7 +209,7 @@ def preform_experiment(args):
     v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
 
     mse, mae = run_metrics("Loss for validation set teacher", v_preds, v_trues)
-    mse, mae = run_metrics("Loss for validation set student", v_preds, v_trues)
+    mse, mae = run_metrics("Loss for validation set student", v_preds_s, v_trues_s)
 
     # Send results / plot models if debug option is on
 
