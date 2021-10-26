@@ -108,19 +108,23 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
             next_iter = iter(next_loader)
             next_data = next(next_iter)
 
-        batch = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        target = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        trn_x = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        trn_y = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        val_data[0] = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        val_data[1] = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        next_data[0] = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        next_data[1] = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
 
-        elem_num += len(batch)
+        elem_num += len(trn_x)
         steps += 1
 
         teacher.optimA.zero_grad()
-        architect.unrolled_backward(args, (batch_x, batch_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
+        architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
 
         teacher.optim.zero_grad()
 
-        result = teacher(batch)
-        loss = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean') # todo: critere
+        result = teacher(trn_x)
+        loss = nn.functional.mse_loss(result.squeeze(2), trn_y.squeeze(2), reduction='mean') # todo: critere
         preds.append(result.detach().cpu().numpy())
         trues.append(target.detach().cpu().numpy())
         unscaled_loss = loss.item()
@@ -129,9 +133,9 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         loss.backward()
         teacher.optim.step()
 
-        result = student(batch)
+        result = student(next_data[0])
         loss_s1 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
-        target = torch.cat([target[:, :args.label_len, :], result], dim=1)
+        target = torch.cat([target[:, :args.label_len, :], teacher[next_data[0]]], dim=1)
         loss_s2 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
         loss_s = loss_s1 + loss_s2
         loss_s.backward()

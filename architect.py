@@ -11,7 +11,7 @@ class Architect:
         self.args = copy.deepcopy(args)
         self.criterion = criterion
         self.teacher = teacher.cuda()
-        self.student = student
+        self.student = student.cuda()
         self.v_teacher = copy.deepcopy(teacher)
         self.v_student = copy.deepcopy(student)
         self.w_momentum = self.args.w_momentum
