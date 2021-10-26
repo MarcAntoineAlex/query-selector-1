@@ -26,14 +26,14 @@ class Architect:
         else:
             return self.criterion(pred * weights, true * weights)
 
-    def virtual_step(self, trn_data, next_data, xi, w_optim_techer, w_optim_student, data_count):
+    def virtual_step(self, trn_data, next_data, xi, w_optim_teacher, w_optim_student, data_count):
         # forward & calc loss
         pred = self.teacher(trn_data[0])
         unreduced_loss = self.critere(pred, trn_data[1][:, -self.args.pred_len, :], data_count, reduction='none')
         gradients = torch.autograd.grad(unreduced_loss.mean(), self.teacher.W(), retain_graph=True)
         with torch.no_grad():
             for w, vw, g in zip(self.teacher.W(), self.v_teacher.W(), gradients):
-                m = w_optim.state[w].get('momentum_buffer', 0.) * self.w_momentum
+                m = w_optim_teacher.state[w].get('momentum_buffer', 0.) * self.w_momentum
                 vw.copy_(w - xi * (m + g + self.w_weight_decay * w))
                 w.grad = g
             for a, va in zip(self.teacher.A(), self.v_teacher.A()):
@@ -45,7 +45,7 @@ class Architect:
         gradients = torch.autograd.grad(unreduced_loss.mean(), self.student.W())
         with torch.no_grad():
             for w, vw, g in zip(self.student.W(), self.v_student.W(), gradients):
-                m = w_optim.state[w].get('momentum_buffer', 0.) * self.w_momentum
+                m = w_optim_student.optim.state[w].get('momentum_buffer', 0.) * self.w_momentum
                 vw.copy_(w - xi * (m + g + self.w_weight_decay * w))
                 w.grad = g
             for a, va in zip(self.student.A(), self.v_student.A()):

@@ -135,6 +135,9 @@ def build_parser():
     parser.add_argument("--local_rank", type=int, default=0)
     parser.add_argument("--run_num", type=int, default=0)
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--w_momentum', type=float, default=0.9)
+    parser.add_argument('--w_weight_decay', type=float, default=3e-4)
+    parser.add_argument('--max_hessian_grad_norm', type=float, default=1)
 
     parser = deepspeed.add_config_arguments(parser)
     return parser
