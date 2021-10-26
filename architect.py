@@ -42,8 +42,7 @@ class Architect:
         pred_teacher = self.teacher(next_data[0])
         pred = self.student(next_data[0])
         print(pred.shape, trn_data[1].shape)
-        unreduced_loss_s = self.critere(pred, torch.cat([trn_data[1][:, :self.args.dec_seq_len, :],
-                                        pred_teacher[:, -self.args.pred_len:, :]], dim=1), data_count, reduction='none')
+        unreduced_loss_s = self.critere(pred, pred_teacher, data_count, reduction='none')
         gradients = torch.autograd.grad(unreduced_loss.mean(), self.student.W())
         with torch.no_grad():
             for w, vw, g in zip(self.student.W(), self.v_student.W(), gradients):
@@ -70,7 +69,7 @@ class Architect:
 
         # calc unrolled loss
         pred = self.v_student(val_data[0])
-        loss = self.criterion(pred, val_data[:, -self.args.pred_len, :])
+        loss = self.criterion(pred, val_data[1][:, -self.args.pred_len, :])
         # compute gradient
         v_W = list(self.v_student.W())
         dw = list(torch.autograd.grad(loss, v_W))
