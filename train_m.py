@@ -134,8 +134,8 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         teacher.optim.step()
 
         result = student(next_data[0])
-        loss_s1 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
-        target = torch.cat([target[:, :args.dec_seq_len, :], teacher[next_data[0]][:, -args.pred_len, :]], dim=1)
+        loss_s1 = nn.functional.mse_loss(result.squeeze(2), next_data[1].squeeze(2), reduction='mean')
+        target = teacher[next_data[0]]
         loss_s2 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
         loss_s = loss_s1 + loss_s2
         loss_s.backward()
