@@ -126,22 +126,22 @@ class Architect:
 
         # w+ = w + eps*dw`
         with torch.no_grad():
-            for p, d in zip(self.teacher.W(), dw):
+            for p, d in zip(self.student.W(), dw):
                 p += eps_w * d
         pred = self.student(trn_data[0])
         loss = self.critere(pred, trn_data[1], data_count)
-        dE_pos = torch.autograd.grad(loss, [trn_data[1]])[0][:, -self.args.pred_len:, :]
+        dE_pos = torch.autograd.grad(loss, [trn_data[1]])[0]
 
         with torch.no_grad():
-            for p, d in zip(self.teacher.W(), dw):
+            for p, d in zip(self.student.W(), dw):
                 p -= 2. * eps_w * d
         pred = self.student(trn_data[0])
         loss = self.critere(pred, trn_data[1], data_count)
-        dE_neg = torch.autograd.grad(loss, [trn_data[1]])[0][:, -self.args.pred_len:, :]
+        dE_neg = torch.autograd.grad(loss, [trn_data[1]])[0]
 
         # recover w
         with torch.no_grad():
-            for p, d in zip(self.teacher.W(), dw):
+            for p, d in zip(self.student.W(), dw):
                 p += eps_w * d
 
         hessian = (dE_pos - dE_neg) / (2. * eps_w)
