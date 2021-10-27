@@ -65,11 +65,10 @@ class Architect:
         unreduced_loss, unreduced_loss_s = self.virtual_step(trn_data, next_data, xi, w_optim_teacher, w_optim_student, data_count)
         if torch.isfinite(unreduced_loss).float().min() < 1:
             print('DAMGER 007')
-        hessian = torch.zeros(args.batch_size, args.pred_len, trn_data[1].shape[-1]).cuda()
 
         # calc unrolled loss
         pred = self.v_student(val_data[0])
-        loss = self.criterion(pred, val_data[1][:, -self.args.pred_len, :])
+        loss = self.criterion(pred, val_data[1])
         # compute gradient
         v_W = list(self.v_student.W())
         dw = list(torch.autograd.grad(loss, v_W))

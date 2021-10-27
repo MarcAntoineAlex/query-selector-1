@@ -188,7 +188,7 @@ def preform_experiment(args):
     valid_data, valid_loader = _get_data(args, flag='test')
     next_data, next_loader = _get_data(args, flag='train') # todo: check
 
-    architect = Architect(args, nn.MSELoss, teacher, student)
+    architect = Architect(args, nn.MSELoss(), teacher, student)
 
     start = time.time()
     for iter in range(1, args.iterations + 1):
