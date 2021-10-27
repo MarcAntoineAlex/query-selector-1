@@ -126,7 +126,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         result = teacher(trn_x)
         loss = nn.functional.mse_loss(result.squeeze(2), trn_y.squeeze(2), reduction='mean') # todo: critere
         preds.append(result.detach().cpu().numpy())
-        trues.append(target.detach().cpu().numpy())
+        trues.append(trn_y.detach().cpu().numpy())
         unscaled_loss = loss.item()
         total_loss += unscaled_loss
         print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss, total_loss / steps,torch.cuda.max_memory_allocated()))
