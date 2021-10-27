@@ -83,7 +83,7 @@ class Architect:
         for n, (h_c, h) in enumerate(zip(hessian_clip, hessian)):
             h_norm = torch.norm(h.detach(), dim=-1)
             max_coeff = h_norm / max_norm
-            max_coeff[max_coeff < 1.0] = torch.tensor(1.0).cuda(args.gpu)
+            max_coeff[max_coeff < 1.0] = torch.tensor(1.0).cuda()
             hessian_clip[n] = torch.div(h, max_coeff.unsqueeze(-1))
         hessian = hessian_clip
         if torch.isfinite(hessian).float().min() < 1:
