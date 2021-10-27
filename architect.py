@@ -43,7 +43,7 @@ class Architect:
         pred = self.student(next_data[0])
         print(pred.shape, trn_data[1].shape)
         unreduced_loss_s = self.critere(pred, pred_teacher, data_count, reduction='none')
-        gradients = torch.autograd.grad(unreduced_loss.mean(), self.student.W())
+        gradients = torch.autograd.grad(unreduced_loss_s.mean(), self.student.W())
         with torch.no_grad():
             for w, vw, g in zip(self.student.W(), self.v_student.W(), gradients):
                 m = w_optim_student.optim.state[w].get('momentum_buffer', 0.) * self.w_momentum
