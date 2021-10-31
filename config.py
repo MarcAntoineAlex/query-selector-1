@@ -125,7 +125,7 @@ def build_parser():
     parser.add_argument('--batch_size', type=int, default=96)
     parser.add_argument('--embedding_size', type=int, default=32)
     parser.add_argument('--dropout', type=float, default=0.15)
-    parser.add_argument('--fp16', action='store_true', default=True)
+    parser.add_argument('--fp16', action='store_true')
 
     parser.add_argument('--inverse', action='store_true', help='inverse output data', default=False)
     parser.add_argument('--num-workers', type=int, default=2)
