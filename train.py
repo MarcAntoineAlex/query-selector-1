@@ -144,7 +144,7 @@ def preform_experiment(args):
                                                               model_parameters=params)
     else:
         model.to('cuda')
-        model.optim = Adam(params, lr=0.001)
+        model.optim = Adam(params, lr=0.00005, weight_decay=1e-2)
 
     train_data, train_loader = _get_data(args, flag='train')
 
