@@ -54,6 +54,20 @@ class dotdict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+
+class ProbMask():
+    def __init__(self, B, L, index, scores, device="cpu"):
+        _mask = torch.ones(L, scores.shape[-1], dtype=torch.bool).to(device).triu(1)
+        _mask_ex = _mask[None, :].expand(B, L, scores.shape[-1])
+        indicator = _mask_ex[torch.arange(B)[:, None],
+                    index, :].to(device)
+        self._mask = indicator.view(scores.shape).to(device)
+
+    @property
+    def mask(self):
+        return self._mask
+
+
 class StandardScaler():
     def __init__(self):
         self.mean = 0.
