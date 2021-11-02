@@ -88,7 +88,7 @@ class ProbAttention(nn.Module):
             contex = V.cumsum(dim=-2)
         return contex
 
-    def _update_context(self, context_in, V, scores, index, L_Q, attn_mask):
+    def _update_context(self, context_in, V, scores, index, L_Q):
         B, L_V, D = V.shape
 
         if self.mask_flag:
@@ -106,7 +106,7 @@ class ProbAttention(nn.Module):
         else:
             return (context_in, None)
 
-    def forward(self, queries, keys, values, attn_mask):
+    def forward(self, queries, keys, values):
         B, L_Q, D = queries.shape
         _, L_K, _ = keys.shape
 
@@ -129,7 +129,7 @@ class ProbAttention(nn.Module):
         # get the context
         context = self._get_initial_context(values, L_Q)
         # update the context with selected top_k queries
-        context, attn = self._update_context(context, values, scores_top, index, L_Q, attn_mask)
+        context, attn = self._update_context(context, values, scores_top, index, L_Q)
 
         return context.contiguous()
 
