@@ -96,7 +96,7 @@ class ProbAttention(nn.Module):
             scores.masked_fill_(attn_mask.mask, -np.inf)
 
         attn = torch.softmax(scores, dim=-1) # nn.Softmax(dim=-1)(scores)
-
+        print(attn.shape, V.shape)
         context_in[torch.arange(B)[:, None],
                    index, :] = torch.matmul(attn, V).type_as(context_in)
         if self.output_attention:
