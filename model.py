@@ -96,10 +96,8 @@ class ProbAttention(nn.Module):
             scores.masked_fill_(attn_mask.mask, -np.inf)
 
         attn = torch.softmax(scores, dim=-1) # nn.Softmax(dim=-1)(scores)
-        print('first', attn.shape, V.shape, context_in.shape)
         context_in[torch.arange(B)[:, None],
                    index, :] = torch.matmul(attn, V).type_as(context_in)
-        print('second', context_in.shape)
         if self.output_attention:
             attns = (torch.ones([B, L_V, L_V])/L_V).type_as(attn).to(attn.device)
             attns[torch.arange(B)[:, None], index, :] = attn
@@ -128,7 +126,7 @@ class ProbAttention(nn.Module):
         # update the context with selected top_k queries
         context, attn = self._update_context(context, values, scores_top, index, L_Q)
 
-        return context.contiguous()
+        return context.contiguous(), None
 
 
 class InferenceModule(torch.nn.Module):
@@ -192,10 +190,8 @@ class MultiHeadAttentionBlock(InferenceModule):
         for h in self.heads:
             res = h(x, kv=kv)
             a.append(h(x, kv=kv))
-            print('third', res.shape)
 
         a = torch.stack(a, dim=-1)  # combine heads
-        print(a.shape)
         a = a.flatten(start_dim=2)  # flatten all head outputs
 
         x = self.fc(a)
