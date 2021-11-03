@@ -96,9 +96,10 @@ class ProbAttention(nn.Module):
             scores.masked_fill_(attn_mask.mask, -np.inf)
 
         attn = torch.softmax(scores, dim=-1) # nn.Softmax(dim=-1)(scores)
-        print(attn.shape, V.shape)
+        print('first', attn.shape, V.shape, context_in.shape)
         context_in[torch.arange(B)[:, None],
                    index, :] = torch.matmul(attn, V).type_as(context_in)
+        print('second', context_in.shape)
         if self.output_attention:
             attns = (torch.ones([B, L_V, L_V])/L_V).type_as(attn).to(attn.device)
             attns[torch.arange(B)[:, None], index, :] = attn
@@ -135,7 +136,6 @@ class InferenceModule(torch.nn.Module):
         for mod in self.modules():
             if mod != self:
                 mod.inference()
-
 
 
 class InferenceModuleList(torch.nn.ModuleList):
