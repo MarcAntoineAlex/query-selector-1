@@ -193,6 +193,7 @@ class MultiHeadAttentionBlock(InferenceModule):
             a.append(h(x, kv=kv))
 
         a = torch.stack(a, dim=-1)  # combine heads
+        print(a.shape)
         a = a.flatten(start_dim=2)  # flatten all head outputs
 
         x = self.fc(a)
