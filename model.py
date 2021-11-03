@@ -190,7 +190,9 @@ class MultiHeadAttentionBlock(InferenceModule):
     def forward(self, x, kv=None):
         a = []
         for h in self.heads:
+            res = h(x, kv=kv)
             a.append(h(x, kv=kv))
+            print('third', res.shape)
 
         a = torch.stack(a, dim=-1)  # combine heads
         print(a.shape)
