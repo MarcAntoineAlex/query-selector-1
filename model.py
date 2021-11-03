@@ -54,7 +54,7 @@ class ProbAttention(nn.Module):
         self.scale = scale
         self.mask_flag = mask_flag
         self.output_attention = output_attention
-        self.dropout = nn.Dropout(attention_dropout)
+        self.dropout = Dropout(attention_dropout)
 
     def _prob_QK(self, Q, K, sample_k, n_top): # n_top: c*ln(L_q)
         # Q [B, L, D]
