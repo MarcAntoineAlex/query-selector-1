@@ -128,6 +128,9 @@ class ProbAttention(nn.Module):
 
         return context.contiguous(), None
 
+    def inference(self):
+        pass # no parameters
+
 
 class InferenceModule(torch.nn.Module):
     def inference(self):
