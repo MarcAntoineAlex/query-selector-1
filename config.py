@@ -10,6 +10,7 @@ class Config:
                  n_encoder_layers=3, encoder_attention='full', n_decoder_layers=3, decoder_attention='full',
                  prediction_type='uni', dropout=0.1, fp16=True,
                  iterations=10, exps=5, deepspeed= True, debug=False):
+        self.dict = {}
         self.data = data
         self.seq_len = seq_len
         self.pred_len = pred_len
@@ -132,6 +133,7 @@ def build_parser():
     parser.add_argument('--freq', type=str, default='h',
                         help='freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h')
 
+    parser.add_argument('--setting', type=str, default='m_h1_24')
     parser.add_argument("--local_rank", type=int, default=0)
     parser.add_argument("--run_num", type=int, default=0)
     parser.add_argument('--debug', action='store_true')

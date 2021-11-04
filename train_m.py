@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 
 import ipc
-from config import build_parser
+from config import build_parser, Config
 from model import Transformer
 from data_loader import Dataset_ETT_hour, Dataset_ETT_minute
 from metrics import metric
@@ -231,6 +231,24 @@ def critere(model, pred, true, data_count, reduction='mean'):
 def main():
     parser = build_parser()
     args = parser.parse_args(None)
+    conf = Config.from_file('settings/tuned/ts_query-selector_{}.json'.format(args.setting))
+    print(conf.to_json())
+    args.data = conf.data
+    args.seq_len = conf.seq_len
+    args.pred_len = conf.pred_len
+    args.dec_seq_len = conf.dec_seq_len
+    args.hidden_size = conf.seq_len
+    args.n_encoder_layers = conf.n_encoder_layers
+    args.n_decoder_layers = conf.n_decoder_layers
+    args.encoder_attention = conf.encoder_attention
+    args.decoder_attention = conf.decoder_attention
+    args.n_heads = conf.n_heads
+    args.batch_size = conf.batch_size
+    args.embedding_size = conf.embedding_size
+    args.iterations = conf.iterations
+    args.exps = conf.exps
+    args.dropout = conf.dropout
+
     preform_experiment(args)
 
 
