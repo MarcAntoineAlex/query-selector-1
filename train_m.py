@@ -241,7 +241,7 @@ def main():
     args.n_encoder_layers = conf.n_encoder_layers
     args.n_decoder_layers = conf.n_decoder_layers
     args.decoder_attention = conf.decoder_attention
-    args.n_heads = conf.n_heads
+    args.n_heads = conf.heads
     args.batch_size = conf.batch_size
     args.embedding_size = conf.embedding_size
     args.iterations = conf.iterations
