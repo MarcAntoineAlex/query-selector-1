@@ -29,7 +29,7 @@ class Architect:
     def virtual_step(self, trn_data, next_data, xi, w_optim_teacher, w_optim_student, data_count):
         # forward & calc loss
         pred = self.teacher(trn_data[0])
-        unreduced_loss = self.critere(pred, trn_data[1], data_count, reduction='none')
+        unreduced_loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], data_count, reduction='none')
         gradients = torch.autograd.grad(unreduced_loss.mean(), self.teacher.W(), retain_graph=True)
         with torch.no_grad():
             for w, vw, g in zip(self.teacher.W(), self.v_teacher.W(), gradients):
@@ -129,14 +129,14 @@ class Architect:
             for p, d in zip(self.student.W(), dw):
                 p += eps_w * d
         pred = self.student(trn_data[0])
-        loss = self.critere(pred, trn_data[1], data_count)
+        loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], data_count)
         dE_pos = torch.autograd.grad(loss, [trn_data[1]])[0]
 
         with torch.no_grad():
             for p, d in zip(self.student.W(), dw):
                 p -= 2. * eps_w * d
         pred = self.student(trn_data[0])
-        loss = self.critere(pred, trn_data[1], data_count)
+        loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], data_count)
         dE_neg = torch.autograd.grad(loss, [trn_data[1]])[0]
 
         # recover w
