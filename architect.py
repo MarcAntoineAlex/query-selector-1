@@ -22,7 +22,11 @@ class Architect:
         weights = torch.softmax(weights, dim=0) ** 0.5
         if reduction != 'mean':
             crit = nn.MSELoss(reduction=reduction)
-            return crit(pred * weights, true * weights).mean(dim=(-1, -2))
+            try:
+                return crit(pred * weights, true * weights).mean(dim=(-1, -2))
+            except RuntimeError:
+                print(pred.shape, weights.shape, true.shape, "HELFLL")
+                exit(1)
         else:
             return self.criterion(pred * weights, true * weights)
 
