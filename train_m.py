@@ -115,13 +115,14 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         next_data[0] = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         next_data[1] = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
 
+        assert torch.abs(next_data[0] - trn_x).max().item() == 0
+
         elem_num += len(trn_x)
         steps += 1
 
-        teacher.optimA.zero_grad()
-        architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
-
-        teacher.optim.zero_grad()
+        # teacher.optimA.zero_grad()
+        # architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
+        # teacher.optimA.zero_grad()
 
         result = teacher(trn_x)
         loss = nn.functional.mse_loss(result.squeeze(2), trn_y.squeeze(2), reduction='mean') # todo: critere
@@ -175,8 +176,6 @@ def preform_experiment(args):
     student = get_model(args)
     params = list(get_W(teacher))
     print('Number of parameters: {}'.format(len(params)))
-    for p in params:
-        print(p.shape)
 
     teacher.to('cuda')
     teacher.optim = Adam(params, lr=0.001)
