@@ -133,7 +133,7 @@ def build_parser():
     parser.add_argument('--freq', type=str, default='h',
                         help='freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h')
 
-    parser.add_argument('--setting', type=str, default='m_h1_24')
+    parser.add_argument('--setting', type=str, default='m_h1_48')
     parser.add_argument("--local_rank", type=int, default=0)
     parser.add_argument("--run_num", type=int, default=0)
     parser.add_argument('--debug', action='store_true')
