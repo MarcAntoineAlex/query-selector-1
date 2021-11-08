@@ -110,10 +110,10 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
 
         trn_x = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         trn_y = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        val_data[0] = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        val_data[1] = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        next_data[0] = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        next_data[1] = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        val_data[0] = torch.tensor(val_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        val_data[1] = torch.tensor(val_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        next_data[0] = torch.tensor(next_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        next_data[1] = torch.tensor(next_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
 
         assert torch.abs(next_data[0] - trn_x).max().item() == 0
 
@@ -125,7 +125,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         # teacher.optimA.zero_grad()
 
         result = teacher(trn_x)
-        loss = nn.functional.mse_loss(result.squeeze(2), trn_y.squeeze(2), reduction='mean') # todo: critere
+        loss = nn.functional.mse_loss(result.squeeze(2), trn_y.squeeze(2), reduction='mean')  # todo: critere
         preds.append(result.detach().cpu().numpy())
         trues.append(trn_y.detach().cpu().numpy())
         unscaled_loss = loss.item()
