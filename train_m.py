@@ -157,6 +157,7 @@ def test(model, test_loader, args, message=''):
     total_loss = 0
     elem_num = 0
     steps = 0
+    model.eval()
     target_device = 'cuda:{}'.format(args.local_rank)
     for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
         batch = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
@@ -174,7 +175,9 @@ def test(model, test_loader, args, message=''):
         print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss,
                                                                                  total_loss / steps,
                                                                                  torch.cuda.max_memory_allocated()))
+    model.train()
     return preds, trues
+
 
 def preform_experiment(args):
     teacher = get_model(args)
@@ -191,6 +194,8 @@ def preform_experiment(args):
     train_data, train_loader = _get_data(args, flag='train')
     valid_data, valid_loader = _get_data(args, flag='test')
     next_data, next_loader = _get_data(args, flag='train')  # todo: check
+    test_data, test_loader = _get_data(args, flag='test')
+
 
     architect = Architect(args, nn.MSELoss(), teacher, student)
 
@@ -199,26 +204,18 @@ def preform_experiment(args):
         preds, trues = run_iteration(teacher, student, train_loader, valid_loader, next_loader, architect, args,
                                      message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
         mse, mae = run_metrics("Loss after iteration {}".format(iter), preds, trues)
-        # if args.local_rank == 0:
-        #     ipc.sendPartials(iter, mse, mae)
-        print("Time per iteration {}, memory {}".format((time.time() - start)/iter, torch.cuda.memory_stats()))
+
+        v_preds, v_trues = test(teacher, test_loader, args, message="Validation set teacher")
+        v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
+        mse_t, mae_t = run_metrics("Loss for validation set teacher", v_preds, v_trues)
+        mse_s, mae_s = run_metrics("Loss for validation set student", v_preds_s, v_trues_s)
+        # print("Time per iteration {}, memory {}".format((time.time() - start)/iter, torch.cuda.memory_stats()))
 
     # print(torch.cuda.max_memory_allocated())
 
     if args.debug:
         teacher.record()
-
-    test_data, test_loader = _get_data(args, flag='test')
-
-    teacher.eval()
-    # Model evaluation on validation data
-    v_preds, v_trues = test(teacher, test_loader, args, message="Validation set teacher")
-    v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
-
-    mse, mae = run_metrics("Loss for validation set teacher", v_preds, v_trues)
-    mse, mae = run_metrics("Loss for validation set student", v_preds_s, v_trues_s)
-
-    # Send results / plot models if debug option is on
+    return mse_t, mae_t, mse_s, mae_s
 
 
 def critere(model, pred, true, data_count, reduction='mean'):
@@ -251,7 +248,15 @@ def main():
     args.exps = conf.exps
     args.dropout = conf.dropout
 
-    preform_experiment(args)
+    results = {'mse_t':[], 'mae_t':[], 'mse_s':[], 'mae_s':[]}
+    for i in range(args.exps):
+        mse_t, mae_t, mse_s, mae_s = preform_experiment(args)
+        results['mse_t'].append(mse_t)
+        results['mae_t'].append(mae_t)
+        results['mse_s'].append(mse_s)
+        results['mae_s'].append(mae_s)
+    print('Teacher: Mse {} Mae {} Student: Mse {}  Mae{}'.format(np.array(results['mse_t']).mean(), np.array(results['mae_t']).mean(),
+                                                                 np.array(results['mse_s']).mean(), np.array(results['mae_s']).mean()))
 
 
 if __name__ == '__main__':
