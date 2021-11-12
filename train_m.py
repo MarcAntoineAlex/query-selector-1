@@ -109,6 +109,8 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         #     next_iter = iter(next_loader)
         #     next_data = next(next_iter)
 
+
+
         trn_x = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         trn_y = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         # val_data[0] = torch.tensor(val_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
@@ -125,6 +127,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         # architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
         # teacher.optimA.zero_grad()
 
+        teacher.optim.zero_grad()
         result = teacher(trn_x)
         loss = nn.functional.mse_loss(result.squeeze(2), trn_y.squeeze(2), reduction='mean')  # todo: critere
         preds.append(result.detach().cpu().numpy())
@@ -136,6 +139,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         loss.backward()
         teacher.optim.step()
 
+        # student.optim.zero_grad()
         # result = student(next_data[0])
         # loss_s1 = nn.functional.mse_loss(result.squeeze(2), next_data[1].squeeze(2), reduction='mean')
         # target = teacher(next_data[0])
@@ -193,9 +197,9 @@ def preform_experiment(args):
 
     start = time.time()
     for iter in range(1, args.iterations + 1):
-        # preds, trues = run_iteration(teacher, student, train_loader, valid_loader, next_loader, architect, args,
-        #                              message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
-        preds, trues = train_run_iteration(teacher, train_loader, args, training=True, message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
+        preds, trues = run_iteration(teacher, student, train_loader, valid_loader, next_loader, architect, args,
+                                     message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
+        # preds, trues = train_run_iteration(teacher, train_loader, args, training=True, message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
         mse, mae = run_metrics("Loss after iteration {}".format(iter), preds, trues)
         # if args.local_rank == 0:
         #     ipc.sendPartials(iter, mse, mae)
@@ -211,9 +215,9 @@ def preform_experiment(args):
 
     teacher.eval()
     # Model evaluation on validation data
-    v_preds, v_trues = train_run_iteration(teacher, test_loader, args, training=False, message="Validation set")
+    # v_preds, v_trues = train_run_iteration(teacher, test_loader, args, training=False, message="Validation set")
 
-    # v_preds, v_trues = test(teacher, test_loader, args, message="Validation set teacher")
+    v_preds, v_trues = test(teacher, test_loader, args, message="Validation set teacher")
     # v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
 
     mse, mae = run_metrics("Loss for validation set teacher", v_preds, v_trues)
@@ -235,22 +239,22 @@ def critere(model, pred, true, data_count, reduction='mean'):
 def main():
     parser = build_parser()
     args = parser.parse_args(None)
-    # conf = Config.from_file('settings/tuned/ts_query-selector_{}.json'.format(args.setting))
-    # print(conf.to_json())
-    # args.data = conf.data
-    # args.seq_len = conf.seq_len
-    # args.pred_len = conf.pred_len
-    # args.dec_seq_len = conf.dec_seq_len
-    # args.hidden_size = conf.seq_len
-    # args.n_encoder_layers = conf.n_encoder_layers
-    # args.n_decoder_layers = conf.n_decoder_layers
-    # args.decoder_attention = conf.decoder_attention
-    # args.n_heads = conf.heads
-    # args.batch_size = conf.batch_size
-    # args.embedding_size = conf.embedding_size
-    # args.iterations = conf.iterations
-    # args.exps = conf.exps
-    # args.dropout = conf.dropout
+    conf = Config.from_file('settings/tuned/ts_query-selector_{}.json'.format(args.setting))
+    print(conf.to_json())
+    args.data = conf.data
+    args.seq_len = conf.seq_len
+    args.pred_len = conf.pred_len
+    args.dec_seq_len = conf.dec_seq_len
+    args.hidden_size = conf.seq_len
+    args.n_encoder_layers = conf.n_encoder_layers
+    args.n_decoder_layers = conf.n_decoder_layers
+    args.decoder_attention = conf.decoder_attention
+    args.n_heads = conf.heads
+    args.batch_size = conf.batch_size
+    args.embedding_size = conf.embedding_size
+    args.iterations = conf.iterations
+    args.exps = conf.exps
+    args.dropout = conf.dropout
 
     preform_experiment(args)
 
