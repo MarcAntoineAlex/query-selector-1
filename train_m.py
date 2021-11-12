@@ -93,27 +93,27 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
     total_loss = 0
     elem_num = 0
     steps = 0
-    data_count = 0
+    # data_count = 0
     target_device = 'cuda:{}'.format(args.local_rank)
     for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(trn_loader):
-        try:
-            val_data = next(val_iter)
-        except:
-            val_iter = iter(val_loader)
-            val_data = next(val_iter)
-
-        try:
-            next_data = next(next_iter)
-        except:
-            next_iter = iter(next_loader)
-            next_data = next(next_iter)
+        # try:
+        #     val_data = next(val_iter)
+        # except:
+        #     val_iter = iter(val_loader)
+        #     val_data = next(val_iter)
+        #
+        # try:
+        #     next_data = next(next_iter)
+        # except:
+        #     next_iter = iter(next_loader)
+        #     next_data = next(next_iter)
 
         trn_x = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         trn_y = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        val_data[0] = torch.tensor(val_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        val_data[1] = torch.tensor(val_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        next_data[0] = torch.tensor(next_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        next_data[1] = torch.tensor(next_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        # val_data[0] = torch.tensor(val_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        # val_data[1] = torch.tensor(val_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        # next_data[0] = torch.tensor(next_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        # next_data[1] = torch.tensor(next_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
 
         # assert torch.abs(next_data[0] - trn_x).max().item() == 0
 
@@ -128,6 +128,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         loss = nn.functional.mse_loss(result.squeeze(2), trn_y.squeeze(2), reduction='mean')  # todo: critere
         preds.append(result.detach().cpu().numpy())
         trues.append(trn_y.detach().cpu().numpy())
+
         unscaled_loss = loss.item()
         total_loss += unscaled_loss
         print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss, total_loss / steps,torch.cuda.max_memory_allocated()))
@@ -141,7 +142,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         # loss_s = loss_s1 + loss_s2 * 0
         # loss_s.backward()
         # student.optim.step()
-        data_count += batch_x.shape[0]
+        # data_count += batch_x.shape[0]
 
     return preds, trues
 
@@ -179,9 +180,9 @@ def preform_experiment(args):
 
     teacher.to('cuda')
     teacher.optim = Adam(params, lr=0.00005, weight_decay=1e-2)
-    teacher.optimA = Adam(teacher.A(), lr=0.3, weight_decay=0.)
-    student.to('cuda')
-    student.optim = Adam(student.W(), lr=0.00005, weight_decay=1e-2)
+    # teacher.optimA = Adam(teacher.A(), lr=0.3, weight_decay=0.)
+    # student.to('cuda')
+    # student.optim = Adam(student.W(), lr=0.00005, weight_decay=1e-2)
 
     train_data, train_loader = _get_data(args, flag='train')
     valid_data, valid_loader = _get_data(args, flag='test')
@@ -230,22 +231,22 @@ def critere(model, pred, true, data_count, reduction='mean'):
 def main():
     parser = build_parser()
     args = parser.parse_args(None)
-    conf = Config.from_file('settings/tuned/ts_query-selector_{}.json'.format(args.setting))
-    print(conf.to_json())
-    args.data = conf.data
-    args.seq_len = conf.seq_len
-    args.pred_len = conf.pred_len
-    args.dec_seq_len = conf.dec_seq_len
-    args.hidden_size = conf.seq_len
-    args.n_encoder_layers = conf.n_encoder_layers
-    args.n_decoder_layers = conf.n_decoder_layers
-    args.decoder_attention = conf.decoder_attention
-    args.n_heads = conf.heads
-    args.batch_size = conf.batch_size
-    args.embedding_size = conf.embedding_size
-    args.iterations = conf.iterations
-    args.exps = conf.exps
-    args.dropout = conf.dropout
+    # conf = Config.from_file('settings/tuned/ts_query-selector_{}.json'.format(args.setting))
+    # print(conf.to_json())
+    # args.data = conf.data
+    # args.seq_len = conf.seq_len
+    # args.pred_len = conf.pred_len
+    # args.dec_seq_len = conf.dec_seq_len
+    # args.hidden_size = conf.seq_len
+    # args.n_encoder_layers = conf.n_encoder_layers
+    # args.n_decoder_layers = conf.n_decoder_layers
+    # args.decoder_attention = conf.decoder_attention
+    # args.n_heads = conf.heads
+    # args.batch_size = conf.batch_size
+    # args.embedding_size = conf.embedding_size
+    # args.iterations = conf.iterations
+    # args.exps = conf.exps
+    # args.dropout = conf.dropout
 
     preform_experiment(args)
 
