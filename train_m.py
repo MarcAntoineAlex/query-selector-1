@@ -178,10 +178,10 @@ def preform_experiment(args):
     print('Number of parameters: {}'.format(len(params)))
 
     teacher.to('cuda')
-    teacher.optim = Adam(params, lr=0.00005)
+    teacher.optim = Adam(params, lr=0.00005, weight_decay=1e-2)
     teacher.optimA = Adam(teacher.A(), lr=0.3, weight_decay=0.)
     student.to('cuda')
-    student.optim = Adam(student.W(), lr=0.00005)
+    student.optim = Adam(student.W(), lr=0.00005, weight_decay=1e-2)
 
     train_data, train_loader = _get_data(args, flag='train')
     valid_data, valid_loader = _get_data(args, flag='test')
