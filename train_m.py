@@ -115,7 +115,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         next_data[0] = torch.tensor(next_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         next_data[1] = torch.tensor(next_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
 
-        assert torch.abs(next_data[0] - trn_x).max().item() == 0
+        # assert torch.abs(next_data[0] - trn_x).max().item() == 0
 
         elem_num += len(trn_x)
         steps += 1
