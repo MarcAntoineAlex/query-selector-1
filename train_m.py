@@ -122,9 +122,9 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         elem_num += len(trn_x)
         steps += 1
 
-        # teacher.optimA.zero_grad()
-        # architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
-        # teacher.optimA.zero_grad()
+        teacher.optimA.zero_grad()
+        architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
+        teacher.optimA.zero_grad()
 
         teacher.optim.zero_grad()
         result = teacher(trn_x)
