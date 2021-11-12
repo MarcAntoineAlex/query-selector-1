@@ -142,7 +142,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         loss_s1 = nn.functional.mse_loss(result.squeeze(2), next_data[1].squeeze(2), reduction='mean')
         target = teacher(next_data[0])
         loss_s2 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
-        loss_s = loss_s1 + loss_s2 * 0.5
+        loss_s = loss_s1 * 0.5 + loss_s2
         loss_s.backward()
         student.optim.step()
         data_count += batch_x.shape[0]
@@ -172,9 +172,9 @@ def test(model, test_loader, args, message=''):
         trues.append(target.detach().cpu().numpy())
         unscaled_loss = loss.item()
         total_loss += unscaled_loss
-        print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss,
-                                                                                 total_loss / steps,
-                                                                                 torch.cuda.max_memory_allocated()))
+        # print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss,
+        #                                                                          total_loss / steps,
+        #                                                                          torch.cuda.max_memory_allocated()))
     model.train()
     return preds, trues
 
@@ -249,7 +249,7 @@ def main():
     args.dropout = conf.dropout
 
     results = {'mse_t':[], 'mae_t':[], 'mse_s':[], 'mae_s':[]}
-    for i in range(args.exps):
+    for i in range(10):
         mse_t, mae_t, mse_s, mae_s = preform_experiment(args)
         results['mse_t'].append(mse_t)
         results['mae_t'].append(mae_t)
