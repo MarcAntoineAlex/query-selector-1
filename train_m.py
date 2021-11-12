@@ -15,7 +15,6 @@ from model import Transformer
 from data_loader import Dataset_ETT_hour, Dataset_ETT_minute
 from metrics import metric
 from architect import Architect
-from train import run_iteration as train_run_iteration
 
 
 def get_model(args):
@@ -94,29 +93,29 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
     total_loss = 0
     elem_num = 0
     steps = 0
-    # data_count = 0
+    data_count = 0
     target_device = 'cuda:{}'.format(args.local_rank)
     for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(trn_loader):
-        # try:
-        #     val_data = next(val_iter)
-        # except:
-        #     val_iter = iter(val_loader)
-        #     val_data = next(val_iter)
-        #
-        # try:
-        #     next_data = next(next_iter)
-        # except:
-        #     next_iter = iter(next_loader)
-        #     next_data = next(next_iter)
+        try:
+            val_data = next(val_iter)
+        except:
+            val_iter = iter(val_loader)
+            val_data = next(val_iter)
+
+        try:
+            next_data = next(next_iter)
+        except:
+            next_iter = iter(next_loader)
+            next_data = next(next_iter)
 
 
 
         trn_x = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         trn_y = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        # val_data[0] = torch.tensor(val_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        # val_data[1] = torch.tensor(val_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        # next_data[0] = torch.tensor(next_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
-        # next_data[1] = torch.tensor(next_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        val_data[0] = torch.tensor(val_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        val_data[1] = torch.tensor(val_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        next_data[0] = torch.tensor(next_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
+        next_data[1] = torch.tensor(next_data[1], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
 
         # assert torch.abs(next_data[0] - trn_x).max().item() == 0
 
@@ -135,20 +134,20 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
 
         unscaled_loss = loss.item()
         total_loss += unscaled_loss
-        print("{} Loss at step {}: {}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss, total_loss / steps,torch.cuda.max_memory_allocated()))
         loss.backward()
         teacher.optim.step()
 
-        # student.optim.zero_grad()
-        # result = student(next_data[0])
-        # loss_s1 = nn.functional.mse_loss(result.squeeze(2), next_data[1].squeeze(2), reduction='mean')
-        # target = teacher(next_data[0])
-        # loss_s2 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
-        # loss_s = loss_s1 + loss_s2 * 0
-        # loss_s.backward()
-        # student.optim.step()
-        # data_count += batch_x.shape[0]
-
+        student.optim.zero_grad()
+        result = student(next_data[0])
+        loss_s1 = nn.functional.mse_loss(result.squeeze(2), next_data[1].squeeze(2), reduction='mean')
+        target = teacher(next_data[0])
+        loss_s2 = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
+        loss_s = loss_s1 + loss_s2 * 0
+        loss_s.backward()
+        student.optim.step()
+        data_count += batch_x.shape[0]
+        print("{} Loss at step {}: t{}  s{}, mean for epoch: {}, mem_alloc: {}".format(message, steps, unscaled_loss,
+              loss_s.item(), total_loss / steps,torch.cuda.max_memory_allocated()))
     return preds, trues
 
 
@@ -185,13 +184,13 @@ def preform_experiment(args):
 
     teacher.to('cuda')
     teacher.optim = Adam(params, lr=0.00005, weight_decay=1e-2)
-    # teacher.optimA = Adam(teacher.A(), lr=0.3, weight_decay=0.)
-    # student.to('cuda')
-    # student.optim = Adam(student.W(), lr=0.00005, weight_decay=1e-2)
+    teacher.optimA = Adam(teacher.A(), lr=0.3, weight_decay=0.)
+    student.to('cuda')
+    student.optim = Adam(student.W(), lr=0.00005, weight_decay=1e-2)
 
     train_data, train_loader = _get_data(args, flag='train')
     valid_data, valid_loader = _get_data(args, flag='test')
-    next_data, next_loader = _get_data(args, flag='train') # todo: check
+    next_data, next_loader = _get_data(args, flag='train')  # todo: check
 
     architect = Architect(args, nn.MSELoss(), teacher, student)
 
@@ -199,29 +198,25 @@ def preform_experiment(args):
     for iter in range(1, args.iterations + 1):
         preds, trues = run_iteration(teacher, student, train_loader, valid_loader, next_loader, architect, args,
                                      message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
-        # preds, trues = train_run_iteration(teacher, train_loader, args, training=True, message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
         mse, mae = run_metrics("Loss after iteration {}".format(iter), preds, trues)
         # if args.local_rank == 0:
         #     ipc.sendPartials(iter, mse, mae)
         print("Time per iteration {}, memory {}".format((time.time() - start)/iter, torch.cuda.memory_stats()))
 
-    print(torch.cuda.max_memory_allocated())
+    # print(torch.cuda.max_memory_allocated())
 
     if args.debug:
         teacher.record()
-
 
     test_data, test_loader = _get_data(args, flag='test')
 
     teacher.eval()
     # Model evaluation on validation data
-    # v_preds, v_trues = train_run_iteration(teacher, test_loader, args, training=False, message="Validation set")
-
     v_preds, v_trues = test(teacher, test_loader, args, message="Validation set teacher")
-    # v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
+    v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
 
     mse, mae = run_metrics("Loss for validation set teacher", v_preds, v_trues)
-    # mse, mae = run_metrics("Loss for validation set student", v_preds_s, v_trues_s)
+    mse, mae = run_metrics("Loss for validation set student", v_preds_s, v_trues_s)
 
     # Send results / plot models if debug option is on
 
