@@ -15,6 +15,7 @@ from model import Transformer
 from data_loader import Dataset_ETT_hour, Dataset_ETT_minute
 from metrics import metric
 from architect import Architect
+from train import run_iteration as train_run_iteration
 
 
 def get_model(args):
@@ -192,8 +193,9 @@ def preform_experiment(args):
 
     start = time.time()
     for iter in range(1, args.iterations + 1):
-        preds, trues = run_iteration(teacher, student, train_loader, valid_loader, next_loader, architect, args,
-                                     message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
+        # preds, trues = run_iteration(teacher, student, train_loader, valid_loader, next_loader, architect, args,
+        #                              message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
+        preds, trues = train_run_iteration(teacher, train_loader, args, training=True, message=' Run {:>3}, iteration: {:>3}:  '.format(args.run_num, iter))
         mse, mae = run_metrics("Loss after iteration {}".format(iter), preds, trues)
         # if args.local_rank == 0:
         #     ipc.sendPartials(iter, mse, mae)
@@ -209,11 +211,13 @@ def preform_experiment(args):
 
     teacher.eval()
     # Model evaluation on validation data
-    v_preds, v_trues = test(teacher, test_loader, args, message="Validation set teacher")
-    v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
+    v_preds, v_trues = train_run_iteration(teacher, test_loader, args, training=False, message="Validation set")
+
+    # v_preds, v_trues = test(teacher, test_loader, args, message="Validation set teacher")
+    # v_preds_s, v_trues_s = test(student, test_loader, args, message="Validation set student")
 
     mse, mae = run_metrics("Loss for validation set teacher", v_preds, v_trues)
-    mse, mae = run_metrics("Loss for validation set student", v_preds_s, v_trues_s)
+    # mse, mae = run_metrics("Loss for validation set student", v_preds_s, v_trues_s)
 
     # Send results / plot models if debug option is on
 
