@@ -240,6 +240,8 @@ def main():
     args.hidden_size = conf.seq_len
     args.n_encoder_layers = conf.n_encoder_layers
     args.n_decoder_layers = conf.n_decoder_layers
+    if args.encoder_attention != 'prob':
+        args.encoder_attention = conf.encoder_attention
     args.decoder_attention = conf.decoder_attention
     args.n_heads = conf.heads
     args.batch_size = conf.batch_size
