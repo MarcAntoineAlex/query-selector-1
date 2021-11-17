@@ -3,7 +3,7 @@ import copy
 
 import torch
 import torch.nn as nn
-
+from torch.nn.functional import sigmoid
 
 class Architect:
     """ Compute gradients of alphas """
@@ -17,23 +17,20 @@ class Architect:
         self.w_momentum = self.args.w_momentum
         self.w_weight_decay = self.args.w_weight_decay
 
-    def critere(self, pred, true, data_count, reduction='mean'):
-        weights = self.teacher.arch[data_count:data_count + pred.shape[0]]
-        weights = torch.softmax(weights, dim=0) ** 0.5
+    def critere(self, pred, true, indice, reduction='mean'):
+        weights = self.teacher.arch[indice, :, :]
+        weights = sigmoid(weights) * 2
         if reduction != 'mean':
             crit = nn.MSELoss(reduction=reduction)
-            try:
-                return crit(pred * weights, true * weights).mean(dim=(-1, -2))
-            except RuntimeError:
-                print(pred.shape, weights.shape, true.shape, "HELFLL")
-                exit(1)
+            return (crit(weights, true) * weights).mean(dim=(-1, -2))
         else:
-            return self.criterion(pred * weights, true * weights)
+            crit = nn.MSELoss(reduction='none')
+            return (crit(pred, true) * weights).mean()
 
-    def virtual_step(self, trn_data, next_data, xi, w_optim_teacher, w_optim_student, data_count):
+    def virtual_step(self, trn_data, next_data, xi, w_optim_teacher, w_optim_student, indice):
         # forward & calc loss
         pred = self.teacher(trn_data[0])
-        unreduced_loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], data_count, reduction='none')
+        unreduced_loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], indice, reduction='none')
         gradients = torch.autograd.grad(unreduced_loss.mean(), self.teacher.W(), retain_graph=True)
         with torch.no_grad():
             for w, vw, g in zip(self.teacher.W(), self.v_teacher.W(), gradients):
@@ -45,7 +42,7 @@ class Architect:
 
         pred_teacher = self.teacher(next_data[0])
         pred = self.student(next_data[0])
-        unreduced_loss_s = self.critere(pred, pred_teacher, data_count, reduction='none')
+        unreduced_loss_s = self.critere(pred, pred_teacher, indice, reduction='none')
         gradients = torch.autograd.grad(unreduced_loss_s.mean(), self.student.W())
         with torch.no_grad():
             for w, vw, g in zip(self.student.W(), self.v_student.W(), gradients):
@@ -56,7 +53,7 @@ class Architect:
                 va.copy_(a)
         return unreduced_loss, unreduced_loss_s
 
-    def unrolled_backward(self, args_in, trn_data, val_data, next_data, xi, w_optim_teacher, w_optim_student, data_count):
+    def unrolled_backward(self, args_in, trn_data, val_data, next_data, xi, w_optim_teacher, w_optim_student, data_count, indice):
         """ Compute unrolled loss and backward its gradients
         Args:
             xi: learning rate for virtual gradient step (same as net lr)
@@ -65,7 +62,7 @@ class Architect:
         # init config
         args = args_in
         # do virtual step (calc w`)
-        unreduced_loss, unreduced_loss_s = self.virtual_step(trn_data, next_data, xi, w_optim_teacher, w_optim_student, data_count)
+        unreduced_loss, unreduced_loss_s = self.virtual_step(trn_data, next_data, xi, w_optim_teacher, w_optim_student, indice)
         if torch.isfinite(unreduced_loss).float().min() < 1:
             print('DAMGER 007')
 
@@ -78,7 +75,7 @@ class Architect:
         for d in dw:
             if torch.isfinite(d).float().min() < 1:
                 print('DAMGER 008')
-        hessian = self.compute_hessian(dw, trn_data, data_count)
+        hessian = self.compute_hessian(dw, trn_data, indice)
 
         # hessian clip
         max_norm = float(args.max_hessian_grad_norm)
@@ -114,7 +111,7 @@ class Architect:
             self.teacher.arch.grad = da * xi * xi
         return unreduced_loss.mean()
 
-    def compute_hessian(self, dw, trn_data, data_count):
+    def compute_hessian(self, dw, trn_data, indice):
         """
         dw = dw` { L_val(alpha, w`, h`) }, dh = dh` { L_val(alpha, w`, h`) }
         w+ = w + eps_w * dw, h+ = h + eps_h * dh
@@ -132,14 +129,14 @@ class Architect:
             for p, d in zip(self.student.W(), dw):
                 p += eps_w * d
         pred = self.student(trn_data[0])
-        loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], data_count)
+        loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], indice)
         dE_pos = torch.autograd.grad(loss, [trn_data[1]])[0]
 
         with torch.no_grad():
             for p, d in zip(self.student.W(), dw):
                 p -= 2. * eps_w * d
         pred = self.student(trn_data[0])
-        loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], data_count)
+        loss = self.critere(pred, trn_data[1][:, -self.args.pred_len:, :], indice)
         dE_neg = torch.autograd.grad(loss, [trn_data[1]])[0]
 
         # recover w

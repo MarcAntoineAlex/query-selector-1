@@ -8,6 +8,7 @@ import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 import torch.nn as nn
+from torch.nn.functional import sigmoid
 
 import ipc
 from config import build_parser, Config
@@ -15,6 +16,7 @@ from model import Transformer
 from data_loader import Dataset_ETT_hour, Dataset_ETT_minute
 from metrics import metric
 from architect import Architect
+from utils.tools import MyDefiniteSampler
 
 
 def get_model(args):
@@ -29,12 +31,13 @@ def get_W(mdl):
     return mdl.W()
 
 
-def _get_data(args, flag):
+def _get_data(args, flag, samp=False):
     if not args.data == 'ETTm1':
         Data = Dataset_ETT_hour
     else:
         Data = Dataset_ETT_minute
     # timeenc = 0 if args.embed != 'timeF' else 1
+    sampler = None
 
     if flag == 'test':
         shuffle_flag = False;
@@ -65,10 +68,15 @@ def _get_data(args, flag):
         # freq=freq
     )
     print(flag, len(data_set))
+    sampler = None
+    if samp:
+        sampler = MyDefiniteSampler(list(range(len(data_set))))
+        shuffle_flag = False
     data_loader = DataLoader(
         data_set,
         batch_size=batch_size,
         shuffle=shuffle_flag,
+        sampler=sampler,
         num_workers=args.num_workers,
         drop_last=drop_last)
 
@@ -108,8 +116,6 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
             next_iter = iter(next_loader)
             next_data = next(next_iter)
 
-
-
         trn_x = torch.tensor(batch_x, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         trn_y = torch.tensor(batch_y, dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
         val_data[0] = torch.tensor(val_data[0], dtype=torch.float16 if args.fp16 else torch.float32, device=target_device)
@@ -121,14 +127,15 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
 
         elem_num += len(trn_x)
         steps += 1
+        indice = trn_loader.sampler.indice[data_count: data_count + trn_y.shape[0]]
 
         teacher.optimA.zero_grad()
-        architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count)
+        architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, indice)
         teacher.optimA.zero_grad()
 
         teacher.optim.zero_grad()
         result = teacher(trn_x)
-        loss = nn.functional.mse_loss(result.squeeze(2), trn_y.squeeze(2), reduction='mean')  # todo: critere
+        loss = critere(teacher, result, trn_y, indice)
         preds.append(result.detach().cpu().numpy())
         trues.append(trn_y.detach().cpu().numpy())
 
@@ -167,7 +174,7 @@ def test(model, test_loader, args, message=''):
         steps += 1
 
         result = model(batch)
-        loss = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')  # todo: critere
+        loss = nn.functional.mse_loss(result.squeeze(2), target.squeeze(2), reduction='mean')
         preds.append(result.detach().cpu().numpy())
         trues.append(target.detach().cpu().numpy())
         unscaled_loss = loss.item()
@@ -191,9 +198,9 @@ def preform_experiment(args):
     student.to('cuda')
     student.optim = Adam(student.W(), lr=0.00005, weight_decay=1e-2)
 
-    train_data, train_loader = _get_data(args, flag='train')
+    train_data, train_loader = _get_data(args, flag='train', samp=True)
     valid_data, valid_loader = _get_data(args, flag='test')
-    next_data, next_loader = _get_data(args, flag='train')  # todo: check
+    next_data, next_loader = _get_data(args, flag='train', samp=True)  # todo: check
     test_data, test_loader = _get_data(args, flag='test')
 
 
@@ -218,15 +225,15 @@ def preform_experiment(args):
     return mse_t, mae_t, mse_s, mae_s
 
 
-def critere(model, pred, true, data_count, reduction='mean'):
-    weights = model.arch[data_count:data_count + pred.shape[0]]
-    weights = torch.softmax(weights, dim=0) ** 0.5
+def critere(model, pred, true, indice, reduction='mean'):
+    weights = model.arch[indice, :, :]
+    weights = sigmoid(weights) * 2
     if reduction != 'mean':
         crit = nn.MSELoss(reduction=reduction)
-        return crit(pred * weights, true * weights).mean(dim=(-1, -2))
+        return (crit(weights, true) * weights).mean(dim=(-1, -2))
     else:
-        crit = nn.MSELoss()
-        return crit(pred * weights, true * weights)
+        crit = nn.MSELoss(reduction='none')
+        return (crit(pred, true) * weights).mean()
 
 def main():
     parser = build_parser()

@@ -1,6 +1,19 @@
 # Original code from https://github.com/zhouhaoyi/Informer2020/
 import numpy as np
 import torch
+from torch.utils.data.sampler import Sampler
+from random import shuffle
+
+class MyDefiniteSampler(Sampler):
+    def __init__(self, indice):
+        self.indice = indice
+
+    def __iter__(self):
+        shuffle(self.indice)
+        return iter(self.indice)
+
+    def __len__(self):
+        return len(self.indice)
 
 def adjust_learning_rate(optimizer, epoch, args):
     # lr = args.learning_rate * (0.2 ** (epoch // 2))

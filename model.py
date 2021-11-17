@@ -369,7 +369,7 @@ class Transformer(InferenceModule):
         self.out_fc = Linear(dec_seq_len * dim_val, out_seq_len*output_len)
 
         self.debug = debug
-        self.arch = torch.nn.Parameter(torch.ones(15000, 1, 1))
+        self.arch = torch.nn.Parameter(torch.zeros(15000, 1, 1))
 
     def forward(self, x):
         # encoder
