@@ -130,7 +130,7 @@ def run_iteration(teacher, student, trn_loader, val_loader, next_loader, archite
         indice = trn_loader.sampler.indice[data_count: data_count + trn_y.shape[0]]
 
         teacher.optimA.zero_grad()
-        architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, indice)
+        architect.unrolled_backward(args, (trn_x, trn_y), val_data, next_data, 0.00005, teacher.optim, student.optim, data_count, indice)
         teacher.optimA.zero_grad()
 
         teacher.optim.zero_grad()
