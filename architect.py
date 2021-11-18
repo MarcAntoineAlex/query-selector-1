@@ -22,7 +22,7 @@ class Architect:
         weights = sigmoid(weights) * 2
         if reduction != 'mean':
             crit = nn.MSELoss(reduction=reduction)
-            return (crit(weights, true) * weights).mean(dim=(-1, -2))
+            return (crit(pred, true) * weights).mean(dim=(-1, -2))
         else:
             crit = nn.MSELoss(reduction='none')
             return (crit(pred, true) * weights).mean()
